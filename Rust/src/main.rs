@@ -7,14 +7,14 @@ use std::collections::HashSet;
 pub struct TrieNode {
     character: char,                   // Character of the Node
     is_word: bool,                     // Boolean if this character is the end of a Word
-    children: HashMap<char, TrieNode>, // Map of the character(s) and their children TrieNodes
+    children: HashMap<char, TrieNode>, // Map of the character and their children TrieNodes
 }
 
 // TRIENODE FUNCTIONS
 impl TrieNode {
     // Make a root TrieNode. Used by makeTrie.
     pub fn makeRootNode() -> TrieNode {
-        // Root nodes have character value of '_'.
+        // Root nodes have character value of '_', since that is not a char in the Board.
         TrieNode {
             character: '_',
             is_word: false,
@@ -22,7 +22,7 @@ impl TrieNode {
         }
     }
 
-    // Make a TrieNode. Params are the char it takes and if it's the end of a word.
+    // Make a TrieNode. Params are its character and a bool if it's the end of a word.
     pub fn makeNode(c: char, isWord: bool) -> TrieNode {
         TrieNode {
             character: c,
@@ -95,7 +95,7 @@ impl Trie {
         let mut trie = Trie::makeTrie(); // Initialize an empty trie...
 
         for word in wordList.iter() {
-            //...iterate through words and isnert them in
+            //...iterate through words and insert them in
             trie.insert(word);
         }
         // Return the trie afterwards
@@ -105,7 +105,7 @@ impl Trie {
     /*
     Finding a word and a prefix in a Trie have the same logic.
     Only difference is if the word is the end of a word (is_word = true)
-    Therefore, the isWord parameter will be modified, and changed to true if the prefix is a word
+    Therefore, the isWord parameter will be modified by reference, and changed to true if the prefix is a word.
     */
     pub fn findPrefix(&mut self, value: &str, isWord: &mut bool) -> bool {
         let chars: Vec<char> = value.chars().collect();
@@ -119,16 +119,16 @@ impl Trie {
                 curNode = curNode.children.get_mut(&chars[i]).unwrap();
             }
         }
-        // If we found the prefix (escaped the for-loop without returning false) and it's the end of a word, modify the isWord param.
+        // If we found the prefix (escaped the for-loop without returning false) and it's the end of a word, modify the isWord parameter.
         if curNode.is_word {
             *isWord = true;
         }
-        return true; // Prefix was found if we reach here.
+        return true;
     }
 }
 
-/* INITIALIZE CHAR AND COORD ADJACENCY MAPS
-PARAMS:
+/* INITIALIZE CHARACTER AND COORDINATE ADJACENCY MAPS
+PARAMETERS:
 coordMap: Map of coordinate keys (y,x) and vectors with coords as values.
 charMap: Map of characters of the board, and a HashSet of the characters adjacent to them.
 board: Immutable array of string slices
@@ -136,15 +136,15 @@ board: Immutable array of string slices
 pub fn initMaps(
     coordMap: &mut HashMap<(usize, usize), Vec<(usize, usize)>>,
     charMap: &mut HashMap<char, HashSet<char>>,
-    board: &[&str]) -> () // Return nothing, just modifying :)
+    board: &[&str]) -> ()
 {
-    let l = board.len();
+    let len = board.len();
 
     // For each row in the board
     for (y, row) in board.iter().enumerate() {
         // For each char in the row
         for (x, ch) in row.chars().enumerate() {
-            // If key (char) doesn't exist, insert a new HashSet as its value. Otherwise ignores this.
+            // If key (character) doesn't exist, insert a new HashSet as its value. Otherwise ignores this.
             charMap.entry(ch).or_insert(HashSet::new());
             // If coord doesnt exist, insert a new Vector into its values.
             coordMap.entry((y, x)).or_insert(Vec::new());
@@ -157,7 +157,7 @@ pub fn initMaps(
                         let newX = x as i32 + dr;
                         let newY = y as i32 + dc;
 
-                        if inBounds(newX, newY, l) {
+                        if inBounds(newX, newY, len) {
                             // If coords are inbounds. Insert the adjacent character into the Key's HashSet.
                             charMap.entry(ch).and_modify(|e| {
                                 e.insert(board[newY as usize].chars().nth(newX as usize).unwrap());
@@ -173,7 +173,7 @@ pub fn initMaps(
         }
     }
 }
-// Helper function checks if a coordinate is in bounds
+// Helper function checks if a coordinate is in bounds of the board
 pub fn inBounds(x: i32, y: i32, length: usize) -> bool {
     x >= 0 && x < (length as i32) && y >= 0 && y < (length as i32)
 }
@@ -201,7 +201,7 @@ pub fn pruneWords(
 }
 // Helper function which checks if a word can be made from the Character Adjacency Map
 pub fn isPossible(word: &str, charMap: &HashMap<char, HashSet<char>>) -> bool {
-    // This shouldn't happen, but Rust Panics if this isn't here.
+    // This shouldn't happen, but it's for avoiding unexpected panics, just in case.
     if word.len() == 0 {
         return false
     }
@@ -211,13 +211,12 @@ pub fn isPossible(word: &str, charMap: &HashMap<char, HashSet<char>>) -> bool {
     }
     
     for i in 0..(word.len() - 1) {
-        // For each character, and the next one...
+        // For each character, and the next one after it...
         let curChar = word.chars().nth(i).unwrap();
         let nextChar = word.chars().nth(i + 1).unwrap();
 
         // If charMap doesn't contain a key for curChar, or nextChar isn't in that key's HashSet, return false.
-        if (!charMap.contains_key(&curChar))
-            || (!charMap.get(&curChar).unwrap().contains(&nextChar))
+        if !charMap.contains_key(&curChar) || !charMap.get(&curChar).unwrap().contains(&nextChar)
         {
             return false;
         }
@@ -226,17 +225,16 @@ pub fn isPossible(word: &str, charMap: &HashMap<char, HashSet<char>>) -> bool {
     return true;
 }
 
-// SEARCH ALGORITHM: DFS
-// MODIFIES the found variable: HashMap<String, Vec<(u8, u8)>>
-/* PARAMS:
-    board: The board, simple enough
+/*SEARCH ALGORITHM: Depth-First-Search
+ PARAMS:
+    board: The board. An immutable array of string slices.
     coordAdj: The coordinate adjacency HashMap.
-    x,y: Coordinates in the board
-    trie: The Prefix Tree
-    curWord: Current word assembled by the board
-    prev: Vector of coordinates
-    foundWords: Words that have been found.
-    found: The "result". Not returned though, just modified.
+    x,y: Coordinates in the board.
+    trie: The Prefix Tree.
+    curWord: Current word assembled by the board.
+    prev: Vector of previously visited coordinates.
+    foundWords: Set of words that have been found.
+    found: The result. Not returned, just modified by reference.
  */
 pub fn dfs(
     board: &[&str],
@@ -283,7 +281,7 @@ pub fn dfs(
         }
     }
     // "unvisit" the character/coordinate when all is said and done.
-        // Only if they're not empty though, since in the first call, they are empty.
+        // Only if they're not empty though, since in the initial call, they are empty.
     if curWord.len()!=0 {
         curWord.pop();
     }
@@ -312,12 +310,12 @@ fn boggle(board: & [&str], words: & Vec<String>) -> HashMap<String, Vec<(usize, 
 
     let mut found: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
 
-    // For each coord on the board
+    // For each coordinate on the board
     for y in 0..board.len()
     {
         for x in 0..board.len()
         {
-            // Do a Depth-First Search
+            // Do a Depth-First Search from that coordinate.
             dfs(&board, &coordAdj, x, y, &mut trie, &mut String::from(""), &mut Vec::new(), &mut HashSet::new(), &mut found) ;
         }
     }
